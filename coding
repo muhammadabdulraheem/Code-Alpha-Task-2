@@ -1,0 +1,204 @@
+#include <iostream>   
+#include <fstream>    
+#include <string>     
+#include <map>        
+#include <limits>     
+#include <cctype>     
+using namespace std; 
+
+const string USER_DATABASE_FILE = "users.txt";
+
+// A simple hashing function for demonstration purposes.
+unsigned long hashPassword(const string& password) {
+    unsigned long hash = 5381; 
+    for (char c : password) {
+        hash = ((hash << 5) + hash) + c; // hash * 33 + c
+    }
+    return hash;
+}
+
+map<string, unsigned long> users;
+
+// Function to clear input buffer, preventing issues with mixed cin and getline
+void clearInputBuffer() {
+    cin.ignore(numeric_limits<streamsize>::max(), '\n');
+}
+
+// Function to load user credentials from the file into the map
+void loadUsers() {
+    ifstream inFile(USER_DATABASE_FILE);
+    if (!inFile.is_open()) {
+        cerr << "User database file not found. A new one will be created.\n";
+        return; 
+    }
+
+    string line;
+    while (getline(inFile, line)) {
+        size_t delimiterPos = line.find(':');
+        if (delimiterPos != string::npos) {
+            string username = line.substr(0, delimiterPos);
+            unsigned long hashedPassword = stoul(line.substr(delimiterPos + 1));
+            users[username] = hashedPassword;
+        }
+    }
+    inFile.close();
+    cout << "User data loaded successfully.\n";
+}
+
+// Function to save user credentials from the map to the file
+void saveUsers() {
+    ofstream outFile(USER_DATABASE_FILE, ios::trunc); 
+    if (!outFile.is_open()) {
+        cerr << "Error: Could not open user database file for writing.\n";
+        return;
+    }
+
+    for (const auto& pair : users) {
+        outFile << pair.first << ":" << pair.second << "\n";
+    }
+    outFile.close();
+    cout << "User data saved successfully.\n";
+}
+
+// Function to validate username based on specific criteria
+bool validateUsername(const string& username) {
+    if (username.length() < 3 || username.length() > 20) {
+        cout << "Error: Username must be between 3 and 20 characters long.\n";
+        return false;
+    }
+    for (char c : username) {
+        if (!isalnum(c) && c != '_') { 
+            cout << "Error: Username can only contain letters, numbers, and underscores.\n";
+            return false;
+        }
+    }
+    if (users.count(username)) {
+        cout << "Error: Username '" << username << "' already exists. Please choose another.\n";
+        return false;
+    }
+    return true;
+}
+
+// Function to validate password strength
+bool validatePassword(const string& password) {
+    if (password.length() < 8) {
+        cout << "Error: Password must be at least 8 characters long.\n";
+        return false;
+    }
+    bool hasLower = false, hasUpper = false, hasDigit = false, hasSymbol = false;
+    for (char c : password) {
+        if (islower(c)) hasLower = true;
+        else if (isupper(c)) hasUpper = true;
+        else if (isdigit(c)) hasDigit = true;
+        else if (ispunct(c) || c == ' ') hasSymbol = true; // Consider space as symbol
+    }
+
+    if (!hasLower || !hasUpper || !hasDigit || !hasSymbol) {
+        cout << "Error: Password must contain at least one lowercase letter, one uppercase letter, one digit, and one symbol/space.\n";
+        return false;
+    }
+    return true;
+}
+
+// Registration Function: Handles user signup
+void registerUser() {
+    string username, password;
+    cout << "\n--- User Registration ---\n";
+
+    // Get and validate username repeatedly until valid
+    while (true) {
+        cout << "Enter desired username (3-20 chars, alphanumeric, underscore): ";
+        getline(cin, username);
+        if (validateUsername(username)) {
+            break;
+        }
+    }
+
+    // Get and validate password repeatedly until valid
+    while (true) {
+        cout << "Enter password (min 8 chars, incl. lower, upper, digit, symbol): ";
+        getline(cin, password);
+        if (validatePassword(password)) {
+            break;
+        }
+    }
+
+    // Simulate Terms and Conditions acceptance
+    char acceptTerms;
+    cout << "Do you accept our Terms and Conditions? (Y/N): ";
+    cin >> acceptTerms;
+    clearInputBuffer(); 
+
+    if (toupper(acceptTerms) != 'Y') {
+        cout << "Registration cancelled. You must accept the terms to register.\n";
+        return;
+    }
+
+    // Hash the password and store credentials in the map
+    unsigned long hashedPassword = hashPassword(password);
+    users[username] = hashedPassword;
+    saveUsers(); 
+
+    cout << "\nRegistration successful! Welcome, " << username << "!\n";
+}
+
+// Login Function: Verifies user identity
+void loginUser() {
+    string username, password;
+    cout << "\n--- User Login ---\n";
+
+    cout << "Enter username: ";
+    getline(cin, username);
+
+    cout << "Enter password: ";
+    getline(cin, password);
+
+    // Check if username exists in our loaded user data
+    if (users.count(username)) {
+        unsigned long enteredPasswordHash = hashPassword(password);
+        if (users[username] == enteredPasswordHash) {
+            cout << "\nLogin successful! Welcome back, " << username << "!\n";
+        }
+        else {
+            cout << "\nLogin failed: Incorrect password.\n";
+        }
+    }
+    else {
+        cout << "\nLogin failed: Username '" << username << "' not found.\n";
+    }
+}
+
+int main() {
+    loadUsers(); // Load existing user data from file when the program starts
+
+    int choice;
+    do {
+        cout << "\n=======================================\n";
+        cout << "     Login & Registration System       \n";
+        cout << "=======================================\n";
+        cout << "1. Register\n";
+        cout << "2. Login\n";
+        cout << "3. Exit\n";
+        cout << "Enter your choice: ";
+
+        cin >> choice;
+        clearInputBuffer(); 
+
+        switch (choice) {
+        case 1:
+            registerUser();
+            break;
+        case 2:
+            loginUser();
+            break;
+        case 3:
+            cout << "Exiting program. Goodbye!\n";
+            break;
+        default:
+            cout << "Invalid choice. Please try again.\n";
+            break;
+        }
+    } while (choice != 3); 
+
+    return 0; 
+}
